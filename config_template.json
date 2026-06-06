@@ -1,0 +1,14 @@
+{
+  "description": "Generic phylogenetic tree label mapping configuration",
+  "instructions": "Replace 'id_mapping' with your sequence ID to label mappings. Create a copy of this file and customize for your organism.",
+  "id_mapping": {
+    "UNIPROT_ID_1": "Common Name (ABBREVIATION)",
+    "UNIPROT_ID_2": "Species Name (CODE)",
+    "UNIPROT_ID_3": "Another Sequence (ID)"
+  },
+  "label_colors": {
+    "Common Name (ABBREVIATION)": "#E74C3C",
+    "Species Name (CODE)": "#3498DB",
+    "Another Sequence (ID)": "#2ECC71"
+  }
+}
