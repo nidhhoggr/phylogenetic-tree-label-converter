@@ -7,12 +7,10 @@ Generic tools for converting sequence identifiers in phylogenetic tree SVG visua
 ## Files Included
 
 ### Scripts
-- **`convert_tree_labels_generic.py`** - Generic Python script (organism-independent)
-- **`convert_tree_labels.py`** - Original ebolavirus-specific script (deprecated, use generic version)
+- **`convert_tree_labels.py`** - Generic Python script (organism-independent)
 
 ### Configuration Files
 - **`config_template.json`** - Template for creating your own mapping config
-- **`ebolavirus_mapping_updated.json`** - Example: Ebolavirus 6 species mapping
 - **`example_mammals_mapping.json`** - Example: Mammalian species mapping
 - **`example_bacteria_mapping.json`** - Example: Bacterial species mapping
 
@@ -61,7 +59,7 @@ Create a JSON file with your sequence ID to name mappings:
 ### 2. Run the Converter
 
 ```bash
-python3 convert_tree_labels_generic.py your_tree.svg -c your_mapping.json
+python3 convert_tree_label.py your_tree.svg -c your_mapping.json
 ```
 
 This creates: `your_tree_labeled.svg`
@@ -71,34 +69,34 @@ This creates: `your_tree_labeled.svg`
 Include color-coded legend on the tree:
 
 ```bash
-python3 convert_tree_labels_generic.py your_tree.svg -c your_mapping.json -l
+python3 convert_tree_label.py your_tree.svg -c your_mapping.json -l
 ```
 
 ## Usage Examples
 
 ### Basic Usage
 ```bash
-python3 convert_tree_labels_generic.py tree.svg -c mapping.json
+python3 convert_tree_label.py tree.svg -c mapping.json
 ```
 
 ### Specify Output File
 ```bash
-python3 convert_tree_labels_generic.py tree.svg -o output.svg -c mapping.json
+python3 convert_tree_label.py tree.svg -o output.svg -c mapping.json
 ```
 
 ### With Verbose Output
 ```bash
-python3 convert_tree_labels_generic.py tree.svg -c mapping.json -v
+python3 convert_tree_label.py tree.svg -c mapping.json -v
 ```
 
 ### With Legend and Verbose
 ```bash
-python3 convert_tree_labels_generic.py tree.svg -c mapping.json -l -v
+python3 convert_tree_label.py tree.svg -c mapping.json -l -v
 ```
 
 ### Get Help
 ```bash
-python3 convert_tree_labels_generic.py --help
+python3 convert_tree_label.py --help
 ```
 
 ## Configuration Format
@@ -144,19 +142,19 @@ This allows existing configs to work without modification.
 
 ### For Ebolavirus (provided)
 ```bash
-python3 convert_tree_labels_generic.py ebola_tree.svg -c ebolavirus_mapping_updated.json
+python3 convert_tree_label.py ebola_tree.svg -c ebolavirus_mapping_updated.json
 ```
 
 ### For Mammals (example)
 ```bash
 # Edit example_mammals_mapping.json with your sequence IDs
-python3 convert_tree_labels_generic.py primate_tree.svg -c example_mammals_mapping.json
+python3 convert_tree_label.py primate_tree.svg -c example_mammals_mapping.json
 ```
 
 ### For Bacteria (example)
 ```bash
 # Edit example_bacteria_mapping.json with your sequence IDs
-python3 convert_tree_labels_generic.py pathogen_tree.svg -c example_bacteria_mapping.json
+python3 convert_tree_label.py pathogen_tree.svg -c example_bacteria_mapping.json
 ```
 
 ### For Your Own Organism
@@ -166,7 +164,7 @@ cp config_template.json my_species_mapping.json
 
 # 2. Edit with your IDs and species names
 # 3. Run converter
-python3 convert_tree_labels_generic.py my_tree.svg -c my_species_mapping.json -v
+python3 convert_tree_label.py my_tree.svg -c my_species_mapping.json -v
 ```
 
 ## Identifying Sequence IDs in Your Tree
@@ -209,7 +207,7 @@ grep "^>" sequences.fasta | cut -d' ' -f1 | sort -u
 
 ### In Python
 ```python
-from convert_tree_labels_generic import TreeLabelConverter, load_mapping_config
+from convert_tree_label import TreeLabelConverter, load_mapping_config
 
 # Load config
 config = load_mapping_config('mapping.json')
@@ -238,7 +236,7 @@ with open('tree_labeled.svg', 'w') as f:
 python scripts/pipeline.py -i sequences.fasta -o results
 
 # Convert tree labels
-python convert_tree_labels_generic.py \
+python convert_tree_label.py \
   results/tree.svg \
   -o results/tree_for_publication.svg \
   -c config/organism_mapping.json \
@@ -273,7 +271,7 @@ Recommended directory structure:
 ```
 your-repo/
 ├── scripts/
-│   ├── convert_tree_labels_generic.py
+│   ├── convert_tree_label.py
 │   └── pipeline.py
 ├── config/
 │   ├── config_template.json
@@ -286,7 +284,7 @@ Add to your workflow:
 ```bash
 # Step in your pipeline documentation
 5. Convert phylogenetic tree labels for publication:
-   python scripts/convert_tree_labels_generic.py \
+   python scripts/convert_tree_label.py \
      results/tree.svg \
      -c config/organism_mapping.json -l
 ```
@@ -339,7 +337,7 @@ Use freely for research and educational purposes. Attribution appreciated but no
 
 ## Examples in This Package
 
-1. **Ebolavirus** (`ebolavirus_mapping_updated.json`)
+1. **Ebolavirus** (`ebolavirus_mapping.json`)
    - 6 virus species with common names
    - Ready to use
 
@@ -353,7 +351,7 @@ Use freely for research and educational purposes. Attribution appreciated but no
 
 ## Questions?
 
-1. Check help: `python3 convert_tree_labels_generic.py --help`
+1. Check help: `python3 convert_tree_label.py --help`
 2. Try example mappings first to understand format
 3. Validate config JSON before running
 4. Use `-v` (verbose) flag to debug
