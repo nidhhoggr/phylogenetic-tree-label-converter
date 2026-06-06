@@ -22,8 +22,6 @@ Generic tools for converting sequence identifiers in phylogenetic tree SVG visua
 ### Configuration Files
 
 - **`config_template.json`** - Template for creating your own mapping config
-- **`example_mammals_mapping.json`** - Example: Mammalian species mapping
-- **`example_bacteria_mapping.json`** - Example: Bacterial species mapping
 
 ## What It Does
 
@@ -325,17 +323,9 @@ Use freely for research and educational purposes. Attribution appreciated but no
 
 ## Examples in This Package
 
-1. **Ebolavirus** (`ebolavirus99_mapping.json`)
+1. **Ebolavirus** (`config_template.json`)
    - 6 virus species with automatic color grouping
    - Ready to use
-
-2. **Mammals** (`example_mammals_mapping.json`)
-   - Modify with your own NCBI IDs
-   - Reference: NCBI Protein database
-
-3. **Bacteria** (`example_bacteria_mapping.json`)
-   - Modify with your own organism IDs
-   - Reference: NCBI taxonomy
 
 ## Workflow Integration
 
