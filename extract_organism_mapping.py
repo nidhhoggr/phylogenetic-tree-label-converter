@@ -1,14 +1,15 @@
 #!/usr/bin/env python3
 """
 Extract organism names from FASTA OS= field and create phylogenetic mapping config.
-Version 3: IDs in tree labels, but legend shows clean virus names only.
+Version 4: UPDATED - Colors grouped by organism subtype, NOT by strain
 
 Reads UniProt FASTA headers and extracts:
 - UniProt ID (accession)
 - Organism name from OS= field
 
 Tree labels: "Q66814 | Sudan ebolavirus (strain Boniface-76)"
-Legend shows: "Sudan ebolavirus (strain Boniface-76)" with color
+Colors: All Sudan ebolavirus variants get SAME color (strains ignored)
+Legend shows: Base organism names only (strain info stripped)
 
 Outputs a JSON configuration file ready for tree label conversion.
 """
@@ -25,14 +26,32 @@ from collections import defaultdict
 def extract_uniprot_header_info(header: str) -> Tuple[str, str]:
     """
     Extract UniProt ID and organism name from FASTA header.
+    
+    Format: tr|A0A4D5SG72|A0A4D5SG72_9MONO Envelope glycoprotein OS=Bombali virus OX=2010960
     """
-    id_match = re.search(r'\|([\w]+)\|', header)
+    # Extract UniProt ID (tr|XXX| or sp|XXX|)
+    id_match = re.search(r'\|([a-zA-Z0-9]+)\|', header)
     uniprot_id = id_match.group(1) if id_match else None
     
+    # Extract organism name from OS= field
     os_match = re.search(r'OS=([^O]+?)(?:\s+OX=|$)', header)
     organism = os_match.group(1).strip() if os_match else "Unknown"
     
     return uniprot_id, organism
+
+
+def extract_organism_group(organism: str) -> str:
+    """
+    Extract base organism name without strain information.
+    
+    Examples:
+    - "Sudan ebolavirus (strain Boniface-76)" -> "Sudan ebolavirus"
+    - "Zaire ebolavirus (strain Gabon-94)" -> "Zaire ebolavirus"
+    - "Reston ebolavirus" -> "Reston ebolavirus"
+    """
+    # Remove strain information in parentheses
+    base_organism = re.sub(r'\s*\(strain[^)]*\)', '', organism)
+    return base_organism.strip()
 
 
 def parse_fasta_headers(fasta_file: str) -> Dict[str, str]:
@@ -54,19 +73,33 @@ def parse_fasta_headers(fasta_file: str) -> Dict[str, str]:
 
 def create_config(mapping: Dict[str, str], add_colors: bool = True) -> Dict:
     """
-    Create phylogenetic mapping configuration.
+    Create phylogenetic mapping configuration with strain-aware grouping.
     
-    Tree labels include ID: "Q66814 | Sudan ebolavirus..."
-    Legend colors map to clean organism names: "Sudan ebolavirus..."
+    Tree labels include ID AND full organism name with strain:
+        "Q66814 | Sudan ebolavirus (strain Boniface-76)"
+    
+    Colors grouped by BASE organism (ignoring strain):
+        All Sudan variants -> same color
+        All Zaire variants -> same color
+    
+    Legend shows BASE organism names only:
+        "Sudan ebolavirus"
+        "Zaire ebolavirus"
     """
-    # Create mapping with IDs for tree labels
+    # Create mapping with IDs for tree labels (keep full organism name including strain)
     mapping_with_ids = {
         uniprot_id: f"{uniprot_id} | {organism}"
         for uniprot_id, organism in mapping.items()
     }
     
-    # Get unique organisms for legend (without IDs)
-    unique_organisms = sorted(set(mapping.values()))
+    # Get base organism names (without strain) for coloring
+    base_organisms = {}
+    for uniprot_id, organism in mapping.items():
+        base = extract_organism_group(organism)
+        base_organisms[uniprot_id] = base
+    
+    # Get unique base organisms for legend
+    unique_base_organisms = sorted(set(base_organisms.values()))
     
     # Define color palette
     colors = [
@@ -82,73 +115,73 @@ def create_config(mapping: Dict[str, str], add_colors: bool = True) -> Dict:
         "#F1C40F",  # Yellow
     ]
     
-    # Map clean organism names to colors
-    organism_colors = {org: colors[i % len(colors)] 
-                      for i, org in enumerate(unique_organisms)}
+    # Map BASE organism names to colors
+    organism_colors = {
+        org: colors[i % len(colors)] 
+        for i, org in enumerate(unique_base_organisms)
+    }
     
-    # For the config, map tree labels to their organism colors
+    # For the config, map tree labels to their BASE organism colors
     label_colors = {}
     for uniprot_id, tree_label in mapping_with_ids.items():
-        organism = mapping[uniprot_id]
-        label_colors[tree_label] = organism_colors[organism]
+        base_org = base_organisms[uniprot_id]
+        label_colors[tree_label] = organism_colors[base_org]
+    
+    # Organism names for legend (base organisms only)
+    organism_names = organism_colors
     
     config = {
-        "description": "Ebolavirus mapping extracted from sequence alignment",
+        "description": "Phylogenetic mapping with organism grouping by subtype (strains grouped)",
         "source": "sequences_aligned.fasta",
         "organism": "Ebolavirus",
         "id_mapping": mapping_with_ids,
         "label_colors": label_colors if add_colors else {},
-        "organism_names": organism_colors,  # Clean names for legend
+        "organism_names": organism_names if add_colors else {},
     }
     
     return config
 
 
-def print_summary(mapping: Dict[str, str]) -> None:
-    """Print summary of extracted mappings."""
-    unique_organisms = sorted(set(mapping.values()))
+def print_summary(mapping: Dict[str, str], show_grouping: bool = True):
+    """Print summary of extracted organisms."""
+    print(f"\n📊 Summary:")
+    print(f"   Total sequences: {len(mapping)}")
     
-    print("\n" + "="*80)
-    print("EXTRACTED VIRUS MAPPING (v3: IDs in tree, clean names in legend)")
-    print("="*80)
-    
-    print(f"\nTotal sequences: {len(mapping)}")
-    print(f"Unique organisms: {len(unique_organisms)}\n")
-    
-    org_counts = defaultdict(int)
-    for org in mapping.values():
-        org_counts[org] += 1
-    
-    print("Breakdown by organism:")
-    for org in sorted(org_counts.keys()):
-        print(f"  • {org}: {org_counts[org]} sequences")
-    
-    print("\nTree label format (ID | Organism):")
-    for uniprot_id, organism in sorted(mapping.items()):
-        print(f"  {uniprot_id} | {organism}")
-    
-    print("\nLegend will show clean organism names (no IDs)")
-    print("\n" + "="*80 + "\n")
+    if show_grouping:
+        # Group by base organism
+        grouped = defaultdict(list)
+        for uniprot_id, organism in mapping.items():
+            base = extract_organism_group(organism)
+            grouped[base].append((uniprot_id, organism))
+        
+        print(f"   Organism groups: {len(grouped)}")
+        for base, variants in sorted(grouped.items()):
+            print(f"\n   {base}:")
+            for uniprot_id, full_org in sorted(variants):
+                if full_org != base:
+                    print(f"      - {uniprot_id} | {full_org}")
+                else:
+                    print(f"      - {uniprot_id} | {full_org}")
 
 
 def main():
-    """Main CLI entry point."""
     parser = argparse.ArgumentParser(
-        description='Extract organism names from FASTA OS= field (v3: IDs in tree, clean legend)',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog='''
-Examples:
-  # Extract with IDs in tree, clean names in legend
-  python extract_organism_mapping_v3.py sequences_aligned.fasta -o mapping.json
-  
-  # With verbose output
-  python extract_organism_mapping_v3.py sequences_aligned.fasta -o mapping.json -v
-        '''
+        description="Extract organism names from FASTA and create phylogenetic mapping config with organism grouping"
     )
-    
-    parser.add_argument('fasta_file', help='Input FASTA file with UniProt headers')
-    parser.add_argument('-o', '--output', help='Output JSON config file', default='organism_mapping.json')
-    parser.add_argument('-v', '--verbose', action='store_true', help='Print detailed output')
+    parser.add_argument(
+        "fasta_file",
+        help="Input FASTA file with UniProt headers"
+    )
+    parser.add_argument(
+        "-o", "--output",
+        default="organism_mapping.json",
+        help="Output JSON config file (default: organism_mapping.json)"
+    )
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        help="Verbose output showing organism grouping"
+    )
     
     args = parser.parse_args()
     
@@ -176,21 +209,26 @@ Examples:
         with open(output_path, 'w') as f:
             json.dump(config, f, indent=2)
         
+        # Count unique base organisms
+        base_orgs = set()
+        for organism in mapping.values():
+            base_orgs.add(extract_organism_group(organism))
+        
         print(f"\n✅ Success!")
         print(f"   Input:  {args.fasta_file}")
         print(f"   Output: {output_path}")
         print(f"   Sequences: {len(mapping)}")
-        print(f"   Unique organisms: {len(set(mapping.values()))}")
+        print(f"   Organism groups (ignoring strains): {len(base_orgs)}")
         
         if args.verbose:
-            print_summary(mapping)
+            print_summary(mapping, show_grouping=True)
         
         print(f"\n💡 Use this config with tree converter:")
-        print(f"   python convert_tree_labels_generic.py tree.svg -c {output_path} -l")
+        print(f"   python convert_tree_labels.py tree.svg -c {output_path} --color -l")
         print(f"\n📋 What you'll get:")
-        print(f"   • Tree labels: ID | Virus Name (e.g., 'Q66814 | Sudan ebolavirus...')")
-        print(f"   • Legend: Clean virus names only (no IDs)")
-        print(f"   • Colors: Applied to both tree and legend")
+        print(f"   • Tree labels: ID | Virus Name with strain (e.g., 'Q66814 | Sudan ebolavirus (strain Boniface-76)')")
+        print(f"   • Colors: Grouped by organism subtype (strains with same base organism get same color)")
+        print(f"   • Legend: Shows {len(base_orgs)} organism groups with colors")
         
     except Exception as e:
         print(f"❌ Error: {e}")

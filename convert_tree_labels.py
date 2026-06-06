@@ -1,239 +1,191 @@
 #!/usr/bin/env python3
-"""
-Generic phylogenetic tree SVG label converter with smart legend handling.
-Version 2: Separates tree labels from legend labels.
-
-Supports:
-- Tree labels with IDs
-- Legend showing clean organism names only
-- Color-coded labels and legend
-"""
+"""Phylogenetic Tree Label Converter"""
 
 import json
 import re
-import sys
 import argparse
 from pathlib import Path
-from typing import Dict, Optional
+
+
+def load_mapping_config(config_path):
+    with open(config_path, 'r') as f:
+        return json.load(f)
+
+
+def extract_accession_id(label):
+    match = re.match(r'^(?:sp|tr)\|([^|]+)\|', label)
+    return match.group(1) if match else label
+
+
+def extract_organism_group(label):
+    """Extract the base organism name without strain info.
+    
+    Examples:
+    - "Q7T9D9 | Sudan ebolavirus (strain Human/Uganda/Gulu/2000)" -> "Sudan ebolavirus"
+    - "A0A1P8YTA8 | Zaire ebolavirus" -> "Zaire ebolavirus"
+    - "B8XCN0 | Bundibugyo virus" -> "Bundibugyo virus"
+    """
+    if '|' not in label:
+        return label
+    
+    organism = label.split('|', 1)[1].strip()
+    # Remove strain info in parentheses
+    organism = re.sub(r'\s*\(strain[^)]*\)', '', organism)
+    return organism.strip()
 
 
 class TreeLabelConverter:
-    """Convert sequence identifiers in phylogenetic tree SVG files."""
     
-    def __init__(self, mapping_config: Dict, verbose: bool = False):
-        self.mapping_config = mapping_config
+    def __init__(self, config, verbose=False, add_colors=False):
         self.verbose = verbose
+        self.add_colors = add_colors
         
-        self.id_map = (
-            mapping_config.get('id_mapping') or
-            mapping_config.get('uniprot_to_subtype') or
-            mapping_config.get('sequence_mapping') or
-            mapping_config
-        )
-        self.replacements_made = {}
-    
-    def convert_svg_labels(self, svg_content: str, apply_colors: bool = True) -> str:
-        """Replace identifiers in SVG text elements with mapped labels."""
-        label_colors = (
-            self.mapping_config.get('label_colors') or
-            self.mapping_config.get('subtype_colors') or
-            {}
-        )
+        self.id_mapping = config.get('id_mapping') or config.get('uniprot_to_subtype') or config.get('sequence_mapping') or {}
+        self.label_colors = config.get('label_colors') or config.get('subtype_colors') or {}
+        self.organism_names = config.get('organism_names') or {}
         
-        text_element_pattern = r'(<text[^>]*>)([^<]+)(</text>)'
-        
-        def replace_text_element(match):
-            opening_tag = match.group(1)
-            original_text = match.group(2).strip()
-            closing_tag = match.group(3)
-            
-            replacement_label = None
-            replacement_color = None
-            
-            for test_id, mapped_label in self.id_map.items():
-                if test_id.upper() in original_text.upper():
-                    if self.verbose:
-                        print(f"  ✓ {original_text} → {mapped_label}")
-                    self.replacements_made[original_text] = mapped_label
-                    replacement_label = mapped_label
-                    
-                    if apply_colors and mapped_label in label_colors:
-                        replacement_color = label_colors[mapped_label]
-                    break
-            
-            if replacement_label is None:
-                return match.group(0)
-            
-            if replacement_color:
-                if 'fill=' in opening_tag:
-                    opening_tag = re.sub(r'fill="[^"]*"', f'fill="{replacement_color}"', opening_tag)
-                else:
-                    opening_tag = opening_tag.rstrip('>') + f' fill="{replacement_color}">'
-            
-            return f"{opening_tag}{replacement_label}{closing_tag}"
-        
-        updated_svg = re.sub(text_element_pattern, replace_text_element, svg_content)
-        return updated_svg
-    
-    def add_legend_to_svg(self, svg_content: str) -> str:
-        """Add legend using organism_names if available, otherwise label_colors."""
-        # Try to use clean organism names for legend
-        organism_names = self.mapping_config.get('organism_names', {})
-        
-        if organism_names:
-            # Use clean organism names (no IDs) in legend
-            legend_items = organism_names
-            if self.verbose:
-                print(f"  🎨 Using clean organism names for legend")
-        else:
-            # Fallback to label colors
-            legend_items = (
-                self.mapping_config.get('label_colors') or
-                self.mapping_config.get('subtype_colors') or
-                {}
-            )
-            if self.verbose:
-                print(f"  🎨 Using label_colors for legend")
-        
-        if not legend_items:
-            if self.verbose:
-                print("  ℹ️  No legend data found, skipping legend")
-            return svg_content
-        
-        # Extract viewBox dimensions
-        viewbox_match = re.search(r'viewBox="([^"]+)"', svg_content)
-        if not viewbox_match:
-            if self.verbose:
-                print("  ⚠️  Could not find viewBox, skipping legend")
-            return svg_content
-        
-        viewbox = viewbox_match.group(1)
-        coords = list(map(float, viewbox.split(',')))
-        width, height = coords[2], coords[3]
-        
-        # Create legend SVG group
-        legend_y = height - 120
-        legend_items_list = []
-        
-        for i, (label, color) in enumerate(legend_items.items()):
-            y = legend_y + (i * 20)
-            legend_items_list.append(
-                f'<circle cx="20" cy="{y}" r="4" fill="{color}"/>\n'
-                f'<text x="30" y="{y + 4}" font-family="Arial" font-size="11" '
-                f'fill="#000000">{label}</text>'
-            )
-        
-        legend = (
-            f'<g id="legend">\n'
-            f'<rect x="10" y="{legend_y - 10}" width="350" '
-            f'height="{len(legend_items_list) * 20 + 10}" fill="#ffffff" '
-            f'stroke="#cccccc" stroke-width="1" opacity="0.9"/>\n'
-            f'{chr(10).join(legend_items_list)}\n'
-            f'</g>'
-        )
-        
-        svg_content = svg_content.replace('</svg>', f'\n{legend}\n</svg>')
+        # Build organism group -> color mapping
+        self.organism_to_color = {}
+        for label, color in self.label_colors.items():
+            group = extract_organism_group(label)
+            if group not in self.organism_to_color:
+                self.organism_to_color[group] = color
         
         if self.verbose:
-            print(f"  🎨 Added legend with {len(legend_items_list)} items")
+            print(f"Loaded {len(self.id_mapping)} ID mappings")
+            print(f"Loaded {len(self.label_colors)} color definitions")
+            print(f"Organism groups: {len(self.organism_to_color)}")
+            for org, color in sorted(self.organism_to_color.items()):
+                print(f"  {org:40s} -> {color}")
+    
+    def convert_svg_labels(self, svg_content):
+        """Convert all matching labels in SVG content."""
+        replacements = 0
         
-        return svg_content
-
-
-def load_mapping_config(config_file: str) -> Dict:
-    """Load mapping configuration from JSON file."""
-    config_path = Path(config_file)
+        # Find all label content blocks - process in reverse order to maintain positions
+        pattern = r'>([^<]+?)<'
+        matches = list(re.finditer(pattern, svg_content, flags=re.DOTALL))
+        
+        modified_content = svg_content
+        offset = 0  # Track position offset as we make changes
+        
+        for match in reversed(matches):
+            full_label = match.group(1).strip()
+            accession_id = extract_accession_id(full_label)
+            
+            if accession_id not in self.id_mapping:
+                continue
+            
+            new_label = self.id_mapping[accession_id]
+            replacements += 1
+            
+            if self.verbose:
+                print(f"  {accession_id:20s} -> {new_label[:50]:50s}", end="")
+            
+            # Replace the content
+            start, end = match.span()
+            
+            # Make the replacement
+            old_text = f">{full_label}<"
+            new_text = f">{new_label}<"
+            modified_content = modified_content[:start] + new_text + modified_content[end:]
+            
+            # Now find and modify the style attribute for this text element
+            if self.add_colors:
+                group = extract_organism_group(new_label)
+                if group in self.organism_to_color:
+                    color = self.organism_to_color[group]
+                    
+                    # Look backwards from start position to find the matching <text tag and its style
+                    search_start = max(0, start - 200)
+                    search_region = modified_content[search_start:start]
+                    
+                    # Find the style="stroke:none;" in this region
+                    style_match = re.search(r'style="stroke:none;"', search_region)
+                    if style_match:
+                        style_start = search_start + style_match.start()
+                        style_end = style_start + len('style="stroke:none;"')
+                        modified_content = (modified_content[:style_start] + 
+                                          f'style="stroke:none;fill:{color};"' +
+                                          modified_content[style_end:])
+                        if self.verbose:
+                            print(f" [{group:30s}] {color}")
+                    else:
+                        if self.verbose:
+                            print()
+                else:
+                    if self.verbose:
+                        print(f" [no color for {group}]")
+            else:
+                if self.verbose:
+                    print()
+        
+        self.replacements = replacements
+        return modified_content
     
-    if not config_path.exists():
-        raise FileNotFoundError(f"Config file not found: {config_file}")
-    
-    with open(config_path, 'r') as f:
-        config = json.load(f)
-    
-    return config
+    def add_legend_to_svg(self, svg_content):
+        if not self.organism_to_color:
+            return svg_content
+        
+        legend_svg = '\n<!-- Color Legend by Organism Group -->\n<g id="legend" transform="translate(20, 20)" style="font-size: 9px; font-family: sans-serif;">\n'
+        
+        y_offset = 0
+        for org, color in sorted(self.organism_to_color.items()):
+            legend_svg += f'  <rect x="0" y="{y_offset}" width="12" height="12" style="fill:{color};stroke:black;stroke-width:0.5"/>\n'
+            legend_svg += f'  <text x="18" y="{y_offset + 10}" style="fill:black;">{org}</text>\n'
+            y_offset += 15
+        
+        legend_svg += '</g>\n'
+        # Insert before </svg> (the closing svg tag might be on its own line or with >\n)
+        return re.sub(r'</svg[^>]*>', legend_svg + '</svg>', svg_content)
 
 
 def main():
-    """Main CLI entry point."""
-    parser = argparse.ArgumentParser(
-        description='Convert sequence IDs in phylogenetic tree SVG to meaningful names',
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog='''
-Examples:
-  # Basic usage
-  python convert_tree_labels_v2.py tree.svg -c mapping.json
-  
-  # With legend and verbose
-  python convert_tree_labels_v2.py tree.svg -c mapping.json -l -v
-        '''
-    )
-    
-    parser.add_argument('input_svg', help='Input phylogenetic tree SVG file')
-    parser.add_argument('-o', '--output', help='Output SVG file', default=None)
-    parser.add_argument('-c', '--config', help='Mapping configuration JSON file', default='config.json')
-    parser.add_argument('-l', '--legend', action='store_true', help='Add color-coded legend')
-    parser.add_argument('-v', '--verbose', action='store_true', help='Print detailed conversion information')
+    parser = argparse.ArgumentParser(description="Convert sequence IDs in phylogenetic tree SVGs to organism names")
+    parser.add_argument("svg_file", help="Input SVG file")
+    parser.add_argument("-c", "--config", required=True, help="Mapping config JSON file")
+    parser.add_argument("-o", "--output", help="Output SVG file")
+    parser.add_argument("-l", "--legend", action="store_true", help="Add legend to output")
+    parser.add_argument("--color", action="store_true", help="Color text labels by organism group (ignoring strains)")
+    parser.add_argument("-v", "--verbose", action="store_true", help="Verbose output")
     
     args = parser.parse_args()
     
-    input_path = Path(args.input_svg)
-    if not input_path.exists():
-        print(f"❌ Error: Input file not found: {args.input_svg}")
-        sys.exit(1)
-    
-    if args.output:
-        output_path = Path(args.output)
-    else:
-        stem = input_path.stem
-        suffix = input_path.suffix
-        output_path = input_path.parent / f"{stem}_labeled{suffix}"
+    try:
+        config = load_mapping_config(args.config)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        print(f"❌ Config error: {e}")
+        return 1
     
     try:
-        if args.verbose:
-            print(f"📖 Loading config: {args.config}")
-        config = load_mapping_config(args.config)
-        
-        if args.verbose:
-            print(f"📄 Loading SVG: {args.input_svg}")
-        with open(input_path, 'r', encoding='utf-8') as f:
+        with open(args.svg_file, 'r') as f:
             svg_content = f.read()
-        
-        if args.verbose:
-            print(f"🔄 Converting labels...")
-        converter = TreeLabelConverter(config, verbose=args.verbose)
-        svg_content = converter.convert_svg_labels(svg_content, apply_colors=args.legend)
-        
-        if args.legend:
-            if args.verbose:
-                print(f"🎨 Adding legend...")
-            svg_content = converter.add_legend_to_svg(svg_content)
-        
-        with open(output_path, 'w', encoding='utf-8') as f:
-            f.write(svg_content)
-        
-        print(f"\n✅ Complete!")
-        print(f"   Input:  {args.input_svg}")
-        print(f"   Output: {output_path}")
-        print(f"   Replaced: {len(converter.replacements_made)} labels")
-        
-        if args.verbose and converter.replacements_made:
-            print(f"\n📋 Replacements made:")
-            for original, replacement in sorted(converter.replacements_made.items()):
-                print(f"   {original} → {replacement}")
+    except FileNotFoundError:
+        print(f"❌ SVG file not found: {args.svg_file}")
+        return 1
     
-    except FileNotFoundError as e:
-        print(f"❌ File Error: {e}")
-        sys.exit(1)
-    except json.JSONDecodeError as e:
-        print(f"❌ JSON Error in config: {e}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"❌ Error: {e}")
-        if args.verbose:
-            import traceback
-            traceback.print_exc()
-        sys.exit(1)
+    converter = TreeLabelConverter(config, verbose=args.verbose, add_colors=args.color)
+    converted_svg = converter.convert_svg_labels(svg_content)
+    
+    if args.legend:
+        converted_svg = converter.add_legend_to_svg(converted_svg)
+    
+    output_path = args.output or str(Path(args.svg_file).parent / f"{Path(args.svg_file).stem}_labeled.svg")
+    
+    with open(output_path, 'w') as f:
+        f.write(converted_svg)
+    
+    print(f"✅ Complete!")
+    print(f"   Input:  {args.svg_file}")
+    print(f"   Output: {output_path}")
+    print(f"   Replaced: {converter.replacements} labels")
+    if args.color:
+        print(f"   Colors: Applied by organism group (strains grouped together)")
+    if args.legend:
+        print(f"   Legend: Added")
+    
+    return 0
 
 
-if __name__ == '__main__':
-    main()
+if __name__ == "__main__":
+    exit(main())
