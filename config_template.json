@@ -1,14 +1,49 @@
 {
-  "description": "Generic phylogenetic tree label mapping configuration",
-  "instructions": "Replace 'id_mapping' with your sequence ID to label mappings. Create a copy of this file and customize for your organism.",
+  "description": "Ebolavirus mapping extracted from sequence alignment",
+  "source": "sequences_aligned.fasta",
+  "organism": "Ebolavirus",
   "id_mapping": {
-    "UNIPROT_ID_1": "Common Name (ABBREVIATION)",
-    "UNIPROT_ID_2": "Species Name (CODE)",
-    "UNIPROT_ID_3": "Another Sequence (ID)"
+    "A0A4D5SG72": "A0A4D5SG72 | Bombali virus",
+    "A0A7S6PRK8": "A0A7S6PRK8 | Bombali virus",
+    "B8XCN0": "B8XCN0 | Bundibugyo virus",
+    "B8XCN1": "B8XCN1 | Bundibugyo virus",
+    "Q66799": "Q66799 | Reston ebolavirus (strain Reston-89)",
+    "Q89569": "Q89569 | Reston ebolavirus (strain Siena/Philippine-92)",
+    "Q66814": "Q66814 | Sudan ebolavirus (strain Boniface-76)",
+    "P60173": "P60173 | Sudan ebolavirus (strain Maleo-79)",
+    "R4P4N7": "R4P4N7 | Sudan ebolavirus",
+    "Q66810": "Q66810 | Tai Forest ebolavirus (strain Cote d'Ivoire-94)",
+    "P60170": "P60170 | Zaire ebolavirus (strain Mayinga-76)",
+    "A0A5J6EDK7": "A0A5J6EDK7 | Zaire ebolavirus",
+    "A0A0D5W952": "A0A0D5W952 | Zaire ebolavirus",
+    "A0A7S6GH20": "A0A7S6GH20 | Zaire ebolavirus"
   },
   "label_colors": {
-    "Common Name (ABBREVIATION)": "#E74C3C",
-    "Species Name (CODE)": "#3498DB",
-    "Another Sequence (ID)": "#2ECC71"
+    "A0A4D5SG72 | Bombali virus": "#E74C3C",
+    "A0A7S6PRK8 | Bombali virus": "#E74C3C",
+    "B8XCN0 | Bundibugyo virus": "#3498DB",
+    "B8XCN1 | Bundibugyo virus": "#3498DB",
+    "Q66799 | Reston ebolavirus (strain Reston-89)": "#2ECC71",
+    "Q89569 | Reston ebolavirus (strain Siena/Philippine-92)": "#F39C12",
+    "Q66814 | Sudan ebolavirus (strain Boniface-76)": "#1ABC9C",
+    "P60173 | Sudan ebolavirus (strain Maleo-79)": "#E67E22",
+    "R4P4N7 | Sudan ebolavirus": "#9B59B6",
+    "Q66810 | Tai Forest ebolavirus (strain Cote d'Ivoire-94)": "#95A5A6",
+    "P60170 | Zaire ebolavirus (strain Mayinga-76)": "#F1C40F",
+    "A0A5J6EDK7 | Zaire ebolavirus": "#34495E",
+    "A0A0D5W952 | Zaire ebolavirus": "#34495E",
+    "A0A7S6GH20 | Zaire ebolavirus": "#34495E"
+  },
+  "organism_names": {
+    "Bombali virus": "#E74C3C",
+    "Bundibugyo virus": "#3498DB",
+    "Reston ebolavirus (strain Reston-89)": "#2ECC71",
+    "Reston ebolavirus (strain Siena/Philippine-92)": "#F39C12",
+    "Sudan ebolavirus": "#9B59B6",
+    "Sudan ebolavirus (strain Boniface-76)": "#1ABC9C",
+    "Sudan ebolavirus (strain Maleo-79)": "#E67E22",
+    "Tai Forest ebolavirus (strain Cote d'Ivoire-94)": "#95A5A6",
+    "Zaire ebolavirus": "#34495E",
+    "Zaire ebolavirus (strain Mayinga-76)": "#F1C40F"
   }
 }
