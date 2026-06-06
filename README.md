@@ -1,107 +1,152 @@
 # Phylogenetic Tree Label Converter
 
-Generic tools for converting sequence identifiers in phylogenetic tree SVG visualizations to human-readable organism/species names.
+Generic tools for converting sequence identifiers in phylogenetic tree SVG visualizations to human-readable organism/species names with optional color-coding.
 
 **Works with any organism** — just create a mapping configuration for your data.
+
+## What's New (v4 Update)
+
+✨ **NEW: Organism-level color grouping** — All variants of the same organism (e.g., all Zaire ebolavirus strains) now get the SAME color, regardless of strain information.
+
+✨ **NEW: Fixed header parsing** — Correctly handles UniProt FASTA headers with `tr|` and `sp|` prefixes.
+
+✨ **Color legends** — Automatically generates visual legends showing organism groups and their assigned colors.
 
 ## Files Included
 
 ### Scripts
-- **`convert_tree_labels.py`** - Generic Python script (organism-independent)
+
+- **`extract_organism_mapping.py`** - Generate mapping configuration from FASTA file
+- **`convert_tree_labels.py`** - Apply mapping to phylogenetic tree SVG with optional colors
 
 ### Configuration Files
+
 - **`config_template.json`** - Template for creating your own mapping config
 - **`example_mammals_mapping.json`** - Example: Mammalian species mapping
 - **`example_bacteria_mapping.json`** - Example: Bacterial species mapping
 
 ## What It Does
 
-The converter replaces cryptic sequence identifiers with meaningful organism/species names.
+The converter replaces cryptic sequence identifiers with meaningful organism/species names and optionally color-codes them by organism type.
 
 ### Before:
+
 ```
-sp|Q66814|VGP EBOSB
-sp|P60173|VSGP EBOSM
-NP_414542
-tr|R4P4N7|R4P4N7 9MONO
+sp|Q66814|VGP_EBOSB
+tr|A0A0N9QUW5|A0A0N9QUW5_9MONO
+sp|O11457|VGP_EBOG4
+tr|A0A3G2XDC4|A0A3G2XDC4_9MONO
 ```
 
-### After:
+### After (with colors):
+
 ```
-Zaire ebolavirus (EBOV)
-Sudan ebolavirus (SUDV)
-Escherichia coli K-12 (E. coli)
-Monogeneric Ebola-like virus
+Q66814 | Sudan ebolavirus (strain Boniface-76)          [Orange #E67E22]
+A0A0N9QUW5 | Sudan ebolavirus                           [Orange #E67E22] ← SAME COLOR!
+O11457 | Zaire ebolavirus (strain Gabon-94)            [Red #E74C3C]
+A0A3G2XDC4 | Zaire ebolavirus                          [Red #E74C3C] ← SAME COLOR!
 ```
+
+Notice: All Sudan variants share one color, all Zaire variants share another — even though they have different strains!
 
 ## Quick Start
 
-### 1. Prepare Your Mapping
+### Step 1: Generate Mapping from FASTA
 
-Create a JSON file with your sequence ID to name mappings:
+```bash
+python3 extract_organism_mapping.py sequences_aligned.fasta -o mapping.json -v
+```
 
+This reads your FASTA file and creates a JSON mapping with:
+- UniProt ID → Full organism name (including strain info)
+- Colors grouped by base organism (strains ignored for color assignment)
+- Organism legend
+
+Output file `mapping.json` example:
 ```json
 {
-  "description": "Your organism",
   "id_mapping": {
-    "SEQUENCE_ID_1": "Species Name (CODE)",
-    "SEQUENCE_ID_2": "Another Species",
-    "SEQUENCE_ID_3": "Third Species"
+    "Q66814": "Q66814 | Sudan ebolavirus (strain Boniface-76)",
+    "A0A0N9QUW5": "A0A0N9QUW5 | Sudan ebolavirus"
   },
   "label_colors": {
-    "Species Name (CODE)": "#FF6B6B",
-    "Another Species": "#4ECDC4",
-    "Third Species": "#95E1D3"
+    "Q66814 | Sudan ebolavirus (strain Boniface-76)": "#E67E22",
+    "A0A0N9QUW5 | Sudan ebolavirus": "#E67E22"
+  },
+  "organism_names": {
+    "Sudan ebolavirus": "#E67E22"
   }
 }
 ```
 
-### 2. Run the Converter
+### Step 2: Convert Tree with Mapping
 
 ```bash
-python3 convert_tree_label.py your_tree.svg -c your_mapping.json
+# Just labels, no colors
+python3 convert_tree_labels.py tree.svg -c mapping.json
+
+# With colors by organism group
+python3 convert_tree_labels.py tree.svg -c mapping.json --color
+
+# With colors AND legend
+python3 convert_tree_labels.py tree.svg -c mapping.json --color -l
+
+# Verbose output to see what's happening
+python3 convert_tree_labels.py tree.svg -c mapping.json --color -l -v
 ```
 
-This creates: `your_tree_labeled.svg`
-
-### 3. (Optional) Add a Legend
-
-Include color-coded legend on the tree:
-
-```bash
-python3 convert_tree_label.py your_tree.svg -c your_mapping.json -l
-```
+This creates `tree_labeled.svg` with:
+- Sequence IDs replaced with organism names
+- Text labels colored by organism type
+- Optional legend showing organism groups
 
 ## Usage Examples
 
-### Basic Usage
+### Generate mapping with verbose output
+
 ```bash
-python3 convert_tree_label.py tree.svg -c mapping.json
+python3 extract_organism_mapping.py sequences.fasta -o config.json -v
 ```
 
-### Specify Output File
-```bash
-python3 convert_tree_label.py tree.svg -o output.svg -c mapping.json
+Output shows:
+```
+📖 Reading FASTA file: sequences.fasta
+✅ Success!
+   Input:  sequences.fasta
+   Output: config.json
+   Sequences: 18
+   Organism groups (ignoring strains): 6
+
+📊 Summary:
+   Total sequences: 18
+   Organism groups: 6
+
+   Bombali virus:
+      - A0A4D5SG72 | Bombali virus
+      ...
+
+   Sudan ebolavirus:
+      - Q66814 | Sudan ebolavirus (strain Boniface-76)
+      - Q7T9D9 | Sudan ebolavirus (strain Human/Uganda/Gulu/2000)
+      ...
 ```
 
-### With Verbose Output
+### Apply to tree with all features
+
 ```bash
-python3 convert_tree_label.py tree.svg -c mapping.json -v
+python3 convert_tree_labels.py tree.svg -c mapping.json --color -l -v
 ```
 
-### With Legend and Verbose
-```bash
-python3 convert_tree_label.py tree.svg -c mapping.json -l -v
-```
+### Specify custom output filename
 
-### Get Help
 ```bash
-python3 convert_tree_label.py --help
+python3 convert_tree_labels.py tree.svg -c mapping.json -o my_custom_output.svg
 ```
 
 ## Configuration Format
 
-### Minimal Config
+### Minimal Config (manual)
+
 ```json
 {
   "id_mapping": {
@@ -111,210 +156,153 @@ python3 convert_tree_label.py --help
 }
 ```
 
-### Full Config (Recommended)
+### Full Config (with colors)
+
 ```json
 {
-  "description": "Descriptive title for your mapping",
-  "organism": "Organism or group name",
+  "description": "Ebolavirus mapping",
+  "organism": "Ebolavirus",
   "id_mapping": {
-    "UNIPROT_ID": "Full Species Name (ABBREVIATION)",
-    "NCBI_ID": "Another Species",
-    "CUSTOM_ID": "Local Sequence"
+    "Q66814": "Q66814 | Sudan ebolavirus (strain Boniface-76)",
+    "O11457": "O11457 | Zaire ebolavirus (strain Gabon-94)"
   },
   "label_colors": {
-    "Full Species Name (ABBREVIATION)": "#HEX_COLOR",
-    "Another Species": "#HEX_COLOR",
-    "Local Sequence": "#HEX_COLOR"
+    "Q66814 | Sudan ebolavirus (strain Boniface-76)": "#E67E22",
+    "O11457 | Zaire ebolavirus (strain Gabon-94)": "#E74C3C"
+  },
+  "organism_names": {
+    "Sudan ebolavirus": "#E67E22",
+    "Zaire ebolavirus": "#E74C3C"
   }
 }
 ```
 
-### Supported Key Names
+### Key Features
 
-The script is flexible and recognizes different configuration key names:
+- **Flexible key names**: The scripts support different naming conventions (`id_mapping`, `uniprot_to_subtype`, `sequence_mapping`, etc.)
+- **Strain-aware grouping**: Automatically groups colors by base organism, stripping strain information from color assignment
+- **Optional colors**: All color fields are optional; script works fine without them
 
-- **ID Mappings**: `id_mapping`, `uniprot_to_subtype`, `sequence_mapping`
-- **Colors**: `label_colors`, `subtype_colors`
+## How It Works
 
-This allows existing configs to work without modification.
+### extract_organism_mapping.py
 
-## Creating Mappings for Different Organisms
+1. **Reads FASTA headers** in UniProt format:
+   ```
+   >sp|Q66814|VGP_EBOSB Envelope glycoprotein OS=Sudan ebolavirus (strain Boniface-76) OX=128948 ...
+   ```
 
-### For Ebolavirus (provided)
-```bash
-python3 convert_tree_label.py ebola_tree.svg -c ebolavirus_mapping_updated.json
-```
+2. **Extracts**:
+   - UniProt ID: `Q66814`
+   - Full organism name: `Sudan ebolavirus (strain Boniface-76)`
 
-### For Mammals (example)
-```bash
-# Edit example_mammals_mapping.json with your sequence IDs
-python3 convert_tree_label.py primate_tree.svg -c example_mammals_mapping.json
-```
+3. **Groups by base organism**:
+   - `Sudan ebolavirus (strain Boniface-76)` → Base: `Sudan ebolavirus`
+   - `Sudan ebolavirus` → Base: `Sudan ebolavirus`
+   - Both get **the same color**!
 
-### For Bacteria (example)
-```bash
-# Edit example_bacteria_mapping.json with your sequence IDs
-python3 convert_tree_label.py pathogen_tree.svg -c example_bacteria_mapping.json
-```
+4. **Generates mapping JSON** with organism-grouped colors
 
-### For Your Own Organism
-```bash
-# 1. Copy the template
-cp config_template.json my_species_mapping.json
+### convert_tree_labels.py
 
-# 2. Edit with your IDs and species names
-# 3. Run converter
-python3 convert_tree_label.py my_tree.svg -c my_species_mapping.json -v
-```
+1. **Reads SVG** and finds all text elements (labels)
+2. **Extracts accession ID** from full UniProt labels
+3. **Looks up** in mapping file
+4. **Replaces** with human-readable name
+5. **Applies color** to text (optional with `--color` flag)
+6. **Adds legend** (optional with `-l` flag)
 
 ## Identifying Sequence IDs in Your Tree
 
 ### UniProt IDs (protein sequences)
+
 Look for: `sp|Q66814|` or `tr|R4P4N7|`
+
 - **sp**: SwissProt (curated, high-quality)
 - **tr**: TrEMBL (translated, unreviewed)
 
 ### NCBI IDs (nucleotide or protein)
+
 Look for: `NP_414542.1` or `NC_000001.1`
+
 - **NP**: NCBI protein
 - **NC**: NCBI nucleotide
 - **NM**: NCBI mRNA
 
 ### Custom IDs
+
 Any other identifier in your tree (local names, custom barcodes, etc.)
 
-## Finding Your Sequence IDs
+## Color Grouping by Organism
 
-### From UniProt
-1. Go to [UniProt.org](https://www.uniprot.org/)
-2. Search for your protein
-3. Copy the accession number (first field)
+**Key Feature**: The tool intelligently groups colors by organism **type**, not by individual strains.
 
-### From NCBI
-1. Go to [NCBI Protein](https://www.ncbi.nlm.nih.gov/protein/) or [NCBI Nucleotide](https://www.ncbi.nlm.nih.gov/nucleotide/)
-2. Search for your sequence
-3. Copy the accession number
+Example with Ebolavirus data:
 
-### From Your Fasta File
+| Organism | Variants | Count | Color |
+|----------|----------|-------|-------|
+| Zaire ebolavirus | (strain Gabon-94), plain | 4 | #E74C3C (red) |
+| Sudan ebolavirus | (strain Boniface-76), (strain Human/Uganda/Gulu/2000), plain | 3 | #E67E22 (orange) |
+| Reston ebolavirus | (strain Reston-89), plain | 3 | #F39C12 (gold) |
+| Bombali virus | (3 variants) | 3 | #E74C3C (red) |
+| Bundibugyo virus | (2 variants) | 2 | #3498DB (blue) |
+| Tai Forest ebolavirus | (strain Cote d'Ivoire-94) | 1 | #34495E (dark gray) |
+
+**All variants of Sudan ebolavirus** get the **same color**, regardless of which strain. This makes it easy to visually group related sequences on your tree!
+
+## Creating Mappings for Different Organisms
+
+### Automatic (recommended)
+
 ```bash
-# Extract just the IDs
-grep "^>" sequences.fasta | cut -d' ' -f1 | sort -u
-
-# This gives you all unique sequence headers to map
+python3 extract_organism_mapping.py your_sequences.fasta -o your_mapping.json -v
 ```
 
-## Integration with Your Pipeline
+### Manual (if needed)
 
-### In Python
-```python
-from convert_tree_label import TreeLabelConverter, load_mapping_config
+1. Copy the template:
+   ```bash
+   cp config_template.json my_species_mapping.json
+   ```
 
-# Load config
-config = load_mapping_config('mapping.json')
+2. Edit with your IDs and species names
 
-# Read tree SVG
-with open('tree.svg') as f:
-    svg_content = f.read()
-
-# Convert labels
-converter = TreeLabelConverter(config, verbose=True)
-converted_svg = converter.convert_svg_labels(svg_content)
-
-# Optionally add legend
-converted_svg = converter.add_legend_to_svg(converted_svg)
-
-# Save
-with open('tree_labeled.svg', 'w') as f:
-    f.write(converted_svg)
-```
-
-### In Shell Script
-```bash
-#!/bin/bash
-
-# Typical bioinformatics pipeline
-python scripts/pipeline.py -i sequences.fasta -o results
-
-# Convert tree labels
-python convert_tree_label.py \
-  results/tree.svg \
-  -o results/tree_for_publication.svg \
-  -c config/organism_mapping.json \
-  -l
-
-echo "Tree ready for publication: results/tree_for_publication.svg"
-```
-
-## Color Scheme Tips
-
-Use web-safe colors or hex codes. Here are some palettes:
-
-### Pastel Palette
-```
-#FF6B6B #4ECDC4 #45B7D1 #FFA07A #95E1D3 #F38181 #AA96DA #FCBAD3
-```
-
-### Vibrant Palette
-```
-#FF0000 #00FF00 #0000FF #FFFF00 #FF00FF #00FFFF #FF8800 #8800FF
-```
-
-### Professional Palette
-```
-#264653 #2A9D8F #E9C46A #F4A261 #E76F51 #D5573B #845EC2 #B39DDB
-```
-
-## Adding to Your GitHub Repository
-
-Recommended directory structure:
-
-```
-your-repo/
-├── scripts/
-│   ├── convert_tree_label.py
-│   └── pipeline.py
-├── config/
-│   ├── config_template.json
-│   ├── ebolavirus_mapping_updated.json
-│   └── your_organism_mapping.json
-└── README.md
-```
-
-Add to your workflow:
-```bash
-# Step in your pipeline documentation
-5. Convert phylogenetic tree labels for publication:
-   python scripts/convert_tree_label.py \
-     results/tree.svg \
-     -c config/organism_mapping.json -l
-```
+3. Use it:
+   ```bash
+   python3 convert_tree_labels.py tree.svg -c my_species_mapping.json --color -l
+   ```
 
 ## Troubleshooting
 
-### "No labels were replaced"
-- Check that your SVG contains sequence IDs
-- Verify IDs in mapping config match exactly (case-sensitive for most formats)
-- Run with `-v` flag to see what the script is looking for
+### "No sequences found or could not parse headers"
 
-### "Config file not found"
-- Check the path to your JSON file
-- Use absolute paths: `/full/path/to/config.json`
-- On Windows: use forward slashes or raw strings
+**Cause**: Your FASTA headers don't match the expected UniProt format.
 
-### "Invalid JSON in config"
-- Validate JSON at [jsonlint.com](https://www.jsonlint.com)
-- Ensure all keys are quoted: `"id_mapping"` not `id_mapping`
-- Trailing commas are not allowed in JSON
+**Check**:
+1. Do your headers start with `>sp|` or `>tr|`?
+2. Do they have an `OS=` field?
 
-### Colors don't appear in legend
-- Include `label_colors` in your config
-- Use valid hex color codes: `#RRGGBB` format
-- Run with `-l` flag to enable legend
+**Example valid headers**:
+```
+>sp|Q66814|VGP_EBOSB Envelope glycoprotein OS=Sudan ebolavirus (strain Boniface-76) OX=128948
+>tr|A0A0N9QUW5|A0A0N9QUW5_9MONO Envelope glycoprotein OS=Sudan ebolavirus OX=186540
+```
 
-### Tree looks wrong
-- The converter only changes text labels, doesn't modify tree structure
-- If branches/nodes are missing, the original SVG may be corrupted
-- Check original SVG opens correctly before converting
+### "0 labels replaced"
+
+**Cause**: The UniProt IDs in your SVG don't match those in your mapping.
+
+**Check**:
+1. Run `extract_organism_mapping.py` on the SAME FASTA file used to generate the tree
+2. Verify mapping.json has the right IDs
+3. Run with `-v` flag to see what's being looked up
+
+### Colors not appearing
+
+**Check**:
+1. Did you use the `--color` flag?
+2. Is your mapping.json valid JSON?
+3. Does it have a `label_colors` section?
 
 ## Python Requirements
 
@@ -328,7 +316,7 @@ Add to your workflow:
 ## Performance
 
 - **Speed**: Instantly (milliseconds for typical trees)
-- **SVG Size**: Unchanged (label length may vary slightly)
+- **SVG Size**: Unchanged
 - **Memory**: Minimal (even 100MB SVGs load fine)
 
 ## License & Usage
@@ -337,8 +325,8 @@ Use freely for research and educational purposes. Attribution appreciated but no
 
 ## Examples in This Package
 
-1. **Ebolavirus** (`ebolavirus_mapping.json`)
-   - 6 virus species with common names
+1. **Ebolavirus** (`ebolavirus99_mapping.json`)
+   - 6 virus species with automatic color grouping
    - Ready to use
 
 2. **Mammals** (`example_mammals_mapping.json`)
@@ -349,11 +337,37 @@ Use freely for research and educational purposes. Attribution appreciated but no
    - Modify with your own organism IDs
    - Reference: NCBI taxonomy
 
+## Workflow Integration
+
+### Typical bioinformatics pipeline
+
+```bash
+#!/bin/bash
+
+# 1. Align sequences
+mafft sequences.fasta > sequences_aligned.fasta
+
+# 2. Build tree
+fasttree -protein sequences_aligned.fasta > tree.newick
+
+# 3. Visualize tree (generates tree.svg)
+python3 your_tree_viz_tool.py tree.newick -o tree.svg
+
+# 4. Generate mapping from same FASTA
+python3 extract_organism_mapping.py sequences_aligned.fasta -o mapping.json
+
+# 5. Convert tree labels and add colors
+python3 convert_tree_labels.py tree.svg -c mapping.json --color -l
+
+# 6. Output ready for publication!
+echo "✅ Final tree: tree_labeled.svg"
+```
+
 ## Questions?
 
-1. Check help: `python3 convert_tree_label.py --help`
-2. Try example mappings first to understand format
-3. Validate config JSON before running
+1. Check help: `python3 convert_tree_labels.py --help`
+2. Try examples first to understand format
+3. Validate config JSON at [jsonlint.com](https://www.jsonlint.com)
 4. Use `-v` (verbose) flag to debug
 
 ---
